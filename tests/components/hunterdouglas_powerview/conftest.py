@@ -1,16 +1,71 @@
 """Common fixtures for Hunter Douglas Powerview tests."""
 
-from collections.abc import Generator
-from unittest.mock import AsyncMock, PropertyMock, patch
+import asyncio
+from collections.abc import AsyncIterator, Generator
+from typing import Self
+from unittest.mock import AsyncMock, patch
 
-from aiopvapi.resources.shade import ShadePosition
+from aiopvapi.events import ShadeEvent
 import pytest
 from pytest_homeassistant.common import (
+    MockConfigEntry,
     load_json_object_fixture,
     load_json_value_fixture,
 )
 
 from homeassistant.components.hunterdouglas_powerview.const import DOMAIN
+
+from .const import MOCK_MAC
+
+
+@pytest.fixture
+def mock_config_entry() -> MockConfigEntry:
+    """Return a configured PowerView gateway."""
+    return MockConfigEntry(
+        domain=DOMAIN,
+        data={"host": "1.2.3.4"},
+        unique_id=MOCK_MAC,
+        version=1,
+        minor_version=2,
+    )
+
+
+class MockShadeEventStream:
+    """A controllable gateway stream for integration tests."""
+
+    def __init__(self) -> None:
+        """Initialize event delivery and connection tracking."""
+        self.queue: asyncio.Queue[ShadeEvent | Exception] = asyncio.Queue()
+        self.connections = 0
+        self.closed = 0
+
+    async def __aenter__(self) -> Self:
+        """Connect without contacting a gateway."""
+        self.connections += 1
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        """Record stream cleanup."""
+        self.closed += 1
+
+    async def events(self) -> AsyncIterator[ShadeEvent]:
+        """Deliver gateway events or disconnect errors."""
+        while True:
+            event = await self.queue.get()
+            if isinstance(event, Exception):
+                raise event
+            yield event
+
+
+@pytest.fixture(autouse=True)
+def mock_event_stream() -> Generator[MockShadeEventStream]:
+    """Prevent integration tests from opening real gateway streams."""
+    stream = MockShadeEventStream()
+    with patch(
+        "homeassistant.components.hunterdouglas_powerview.coordinator.ShadeEventStream",
+        return_value=stream,
+    ):
+        yield stream
 
 
 @pytest.fixture
@@ -61,11 +116,6 @@ def mock_hunterdouglas_hub(
         ),
         patch(
             "homeassistant.components.hunterdouglas_powerview.cover.BaseShade.refresh",
-        ),
-        patch(
-            "homeassistant.components.hunterdouglas_powerview.cover.BaseShade.current_position",
-            new_callable=PropertyMock,
-            return_value=ShadePosition(primary=0, secondary=0, tilt=0, velocity=0),
         ),
         patch(
             "aiopvapi.scenes.SceneMembers.get_resources",
@@ -155,8 +205,10 @@ def scenemembers_json(api_version: int) -> str:
 
 
 @pytest.fixture
-def shades_json(api_version: int) -> str:
+def shades_json(api_version: int, request: pytest.FixtureRequest) -> str:
     """Return the get_resources fixture for a specific device."""
+    if hasattr(request, "param"):
+        return request.param
     if api_version == 1:
         return "gen1/shades.json"
     if api_version == 2:

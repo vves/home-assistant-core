@@ -25,6 +25,7 @@ PARALLEL_UPDATES = 1
 PLATFORMS = [
     Platform.BUTTON,
     Platform.COVER,
+    Platform.LIGHT,
     Platform.NUMBER,
     Platform.SCENE,
     Platform.SELECT,
@@ -118,6 +119,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: PowerviewConfigEntry) ->
         coordinator=coordinator,
         device_info=device_info,
     )
+
+    if coordinator.is_push:
+        try:
+            await coordinator.async_start_event_stream()
+        except HUB_EXCEPTIONS as err:
+            raise ConfigEntryNotReady(
+                f"Unable to connect to PowerView event stream at {hub_address}"
+            ) from err
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

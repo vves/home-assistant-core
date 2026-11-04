@@ -52,6 +52,11 @@
         "name": "Top"
       }
     },
+    "light": {
+      "aura": {
+        "name": "Light"
+      }
+    },
     "select": {
       "power_source": {
         "name": "Power source"

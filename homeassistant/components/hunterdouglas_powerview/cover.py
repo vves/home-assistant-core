@@ -80,11 +80,12 @@ async def async_setup_entry(
     async_add_entities(entities)
 
     # background the fetching of state for initial launch
-    entry.async_create_background_task(
-        hass,
-        _async_initial_refresh(),
-        f"powerview {entry.title} initial shade refresh",
-    )
+    if not coordinator.is_push:
+        entry.async_create_background_task(
+            hass,
+            _async_initial_refresh(),
+            f"powerview {entry.title} initial shade refresh",
+        )
 
 
 class PowerViewShadeBase(ShadeEntity, CoverEntity):
@@ -122,7 +123,7 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
         for battery power devices so we set assumed
         state in this case.
         """
-        return not self._is_hard_wired
+        return not self.coordinator.is_push and not self._is_hard_wired
 
     @property
     @override
@@ -133,7 +134,7 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
         as it would drain their batteries in a matter
         of days.
         """
-        return self._is_hard_wired
+        return not self.coordinator.is_push and self._is_hard_wired
 
     @property
     @override
@@ -160,9 +161,13 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
 
     @property
     @override
-    def current_cover_position(self) -> int:
+    def current_cover_position(self) -> int | None:
         """Return the current position of cover."""
-        return self.positions.primary
+        return self._get_cover_position(self.positions)
+
+    def _get_cover_position(self, positions: ShadePosition) -> int | None:
+        """Map shade positions into this cover's position."""
+        return positions.primary
 
     @property
     def transition_steps(self) -> int:
@@ -184,6 +189,8 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
         """Close the cover."""
         self._async_schedule_update_for_transition(self.transition_steps)
         await self._async_execute_move(self.close_position)
+        if self.coordinator.is_push:
+            return
         self._attr_is_opening = False
         self._attr_is_closing = True
         self.async_write_ha_state()
@@ -193,6 +200,8 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
         """Open the cover."""
         self._async_schedule_update_for_transition(100 - self.transition_steps)
         await self._async_execute_move(self.open_position)
+        if self.coordinator.is_push:
+            return
         self._attr_is_opening = True
         self._attr_is_closing = False
         self.async_write_ha_state()
@@ -202,7 +211,8 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
         """Stop the cover."""
         self._async_cancel_scheduled_transition_update()
         await self._shade.stop()
-        await self._async_force_refresh_state()
+        if not self.coordinator.is_push:
+            await self._async_force_refresh_state()
 
     @callback
     def _clamp_cover_limit(self, target_hass_position: int) -> int:
@@ -226,6 +236,10 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
     async def _async_execute_move(self, move: ShadePosition) -> None:
         """Execute a move that can affect multiple positions."""
         _LOGGER.debug("Move request %s: %s", self.name, move)
+        if self.coordinator.is_push:
+            async with self.coordinator.radio_operation_lock:
+                await self._shade.move(move, update_position=False)
+            return
         # Store the requested positions so subsequent move
         # requests contain the secondary shade positions
         self.data.update_shade_position(self._shade.id, move)
@@ -241,6 +255,8 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
             abs(current_hass_position - target_hass_position)
         )
         await self._async_execute_move(self._get_shade_move(target_hass_position))
+        if self.coordinator.is_push:
+            return
         self._attr_is_opening = target_hass_position > current_hass_position
         self._attr_is_closing = target_hass_position < current_hass_position
         self.async_write_ha_state()
@@ -264,6 +280,8 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
 
     @callback
     def _async_schedule_update_for_transition(self, steps: int) -> None:
+        if self.coordinator.is_push:
+            return
         # Cancel any previous updates
         self._async_cancel_scheduled_transition_update()
 
@@ -310,6 +328,7 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
     async def async_will_remove_from_hass(self) -> None:
         """Cancel any pending refreshes."""
         self._async_cancel_scheduled_transition_update()
+        await super().async_will_remove_from_hass()
 
     @property
     def _update_in_progress(self) -> bool:
@@ -324,11 +343,27 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
             # If a transition is in progress the data will be wrong
             return
         self.data.update_from_group_data(self._shade.id)
+        if self.coordinator.is_push:
+            self._shade.raw_data = self.data.get_raw_data(self._shade.id)
+            self._attr_is_opening = False
+            self._attr_is_closing = False
+            event_state = self.coordinator.event_state
+            if (
+                event_state is not None
+                and (target := event_state.target_position(self._shade.id)) is not None
+            ):
+                target_position = self._get_cover_position(target)
+                current_position = self.current_cover_position
+                if target_position is not None and current_position is not None:
+                    self._attr_is_opening = target_position > current_position
+                    self._attr_is_closing = target_position < current_position
         self.async_write_ha_state()
 
     @override
     async def async_update(self) -> None:
         """Refresh shade position."""
+        if self.coordinator.is_push:
+            return
         if self._update_in_progress:
             # The update will likely timeout and
             # error if are already have one in flight
@@ -544,9 +579,8 @@ class PowerViewShadeTiltOnly(PowerViewShadeWithTiltBase):
             self._attr_supported_features |= CoverEntityFeature.STOP_TILT
         self._max_tilt = self._shade.shade_limits.tilt_max
 
-    @property
     @override
-    def current_cover_position(self) -> int:
+    def _get_cover_position(self, positions: ShadePosition) -> int | None:
         """Return the current position of cover."""
         # allows using parent class with no other alterations
         return CLOSED_POSITION
@@ -582,12 +616,11 @@ class PowerViewShadeTopDown(PowerViewShadeBase):
 
     _attr_name = None
 
-    @property
     @override
-    def current_cover_position(self) -> int:
+    def _get_cover_position(self, positions: ShadePosition) -> int | None:
         """Return the current position of cover."""
         # inverted positioning
-        return MAX_POSITION - self.positions.primary
+        return MAX_POSITION - positions.primary
 
     @override
     async def async_set_cover_position(self, **kwargs: Any) -> None:
@@ -694,12 +727,11 @@ class PowerViewShadeTDBUTop(PowerViewShadeDualRailBase):
         # top shade needs to check other motor
         return self.positions.secondary <= CLOSED_POSITION
 
-    @property
     @override
-    def current_cover_position(self) -> int:
+    def _get_cover_position(self, positions: ShadePosition) -> int | None:
         """Return the current position of cover."""
         # these need to be inverted to report state correctly in HA
-        return self.positions.secondary
+        return positions.secondary
 
     @property
     @override
@@ -801,15 +833,14 @@ class PowerViewShadeDualOverlappedCombined(PowerViewShadeDualOverlappedBase):
         # if rear shade is down it is closed
         return self.positions.secondary <= CLOSED_POSITION
 
-    @property
     @override
-    def current_cover_position(self) -> int:
+    def _get_cover_position(self, positions: ShadePosition) -> int | None:
         """Return the current position of cover."""
         # if front is open return that (other positions are impossible)
         # if front shade is closed get position of rear
-        position = (self.positions.primary / 2) + 50
-        if self.positions.primary == MIN_POSITION:
-            position = self.positions.secondary / 2
+        position = (positions.primary / 2) + 50
+        if positions.primary == MIN_POSITION:
+            position = positions.secondary / 2
 
         return ceil(position)
 
@@ -939,11 +970,10 @@ class PowerViewShadeDualOverlappedRear(PowerViewShadeDualOverlappedBase):
         # if rear shade is down it is closed
         return self.positions.secondary <= CLOSED_POSITION
 
-    @property
     @override
-    def current_cover_position(self) -> int:
+    def _get_cover_position(self, positions: ShadePosition) -> int | None:
         """Return the current position of cover."""
-        return self.positions.secondary
+        return positions.secondary
 
     @callback
     @override
