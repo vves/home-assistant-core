@@ -38,7 +38,7 @@ _LOGGER = logging.getLogger(__name__)
 # from one state to another
 TRANSITION_COMPLETE_DURATION = 40
 
-PARALLEL_UPDATES = 1
+PARALLEL_UPDATES = 0
 
 RESYNC_DELAY = 60
 
@@ -210,7 +210,11 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stop the cover."""
         self._async_cancel_scheduled_transition_update()
-        await self._shade.stop()
+        if self.coordinator.is_push:
+            await self._shade.stop()
+        else:
+            async with self.coordinator.radio_operation_lock:
+                await self._shade.stop()
         if not self.coordinator.is_push:
             await self._async_force_refresh_state()
 
@@ -237,8 +241,7 @@ class PowerViewShadeBase(ShadeEntity, CoverEntity):
         """Execute a move that can affect multiple positions."""
         _LOGGER.debug("Move request %s: %s", self.name, move)
         if self.coordinator.is_push:
-            async with self.coordinator.radio_operation_lock:
-                await self._shade.move(move, update_position=False)
+            await self._shade.move(move, update_position=False)
             return
         # Store the requested positions so subsequent move
         # requests contain the secondary shade positions

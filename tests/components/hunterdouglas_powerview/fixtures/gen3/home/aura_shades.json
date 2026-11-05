@@ -339,5 +339,115 @@
     "shadeGroupIds": [],
     "type": 96,
     "shade_api_class": "ShadeDualOverlappedIlluminated"
+  },
+  {
+    "id": 414,
+    "type": 6,
+    "name": "RmFtaWx5IE90aGVy",
+    "ptName": "Family Other",
+    "motion": null,
+    "capabilities": 0,
+    "powerType": 2,
+    "batteryStatus": 3,
+    "roomId": 217,
+    "firmware": {
+      "revision": 3,
+      "subRevision": 0,
+      "build": 309
+    },
+    "positions": {
+      "primary": 0,
+      "secondary": 0,
+      "tilt": 0,
+      "velocity": 0
+    },
+    "signalStrength": -71,
+    "bleName": "TEST:414",
+    "shadeGroupIds": [],
+    "shade_api_class": "ShadeBottomUp"
+  },
+  {
+    "id": 6540,
+    "type": 18,
+    "name": "RmFtaWx5IFRpbHQgT3RoZXI=",
+    "ptName": "Family Tilt Other",
+    "motion": null,
+    "capabilities": 1,
+    "powerType": 2,
+    "batteryStatus": 3,
+    "roomId": 217,
+    "firmware": {
+      "revision": 3,
+      "subRevision": 0,
+      "build": 309
+    },
+    "positions": {
+      "primary": 0,
+      "secondary": 0,
+      "tilt": 0,
+      "velocity": 0
+    },
+    "signalStrength": -74,
+    "bleName": "TEST:6540",
+    "shadeGroupIds": [],
+    "shade_api_class": "ShadeBottomUpTiltOnClosed90"
+  },
+  {
+    "batteryStatus": null,
+    "bleName": "TEST:291",
+    "capabilities": 11,
+    "firmware": {
+      "build": 400,
+      "revision": 3,
+      "subRevision": 0
+    },
+    "id": 291,
+    "motion": null,
+    "name": "QXVyYSBMZWZ0",
+    "positions": {
+      "primary": 0,
+      "secondary": 1,
+      "tilt": 0,
+      "light": {
+        "brightness": 50,
+        "temperature": 2700
+      },
+      "velocity": 0
+    },
+    "powerType": 12,
+    "ptName": "Aura Left",
+    "roomId": 9,
+    "shadeGroupIds": [],
+    "type": 96,
+    "shade_api_class": "ShadeDualOverlappedIlluminated"
+  },
+  {
+    "batteryStatus": null,
+    "bleName": "TEST:281",
+    "capabilities": 11,
+    "firmware": {
+      "build": 400,
+      "revision": 3,
+      "subRevision": 0
+    },
+    "id": 281,
+    "motion": null,
+    "name": "QXVyYSBSaWdodA==",
+    "positions": {
+      "primary": 0,
+      "secondary": 1,
+      "tilt": 0,
+      "light": {
+        "brightness": 50,
+        "temperature": 2700
+      },
+      "velocity": 0
+    },
+    "powerType": 12,
+    "ptName": "Aura Right",
+    "roomId": 9,
+    "shadeGroupIds": [],
+    "type": 96,
+    "shade_api_class": "ShadeDualOverlappedIlluminated"
   }
 ]

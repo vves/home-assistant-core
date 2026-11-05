@@ -22,7 +22,7 @@ from .coordinator import PowerviewShadeUpdateCoordinator
 from .entity import ShadeEntity
 from .model import PowerviewConfigEntry, PowerviewDeviceInfo
 
-PARALLEL_UPDATES = 1
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
@@ -124,9 +124,8 @@ class PowerViewAuraLight(ShadeEntity, LightEntity):
             raise HomeAssistantError(
                 "Aura color temperature is unknown; specify color_temp_kelvin"
             )
-        async with self.coordinator.radio_operation_lock:
-            await self._shade.set_light(
-                brightness=brightness,
-                temperature=temperature,
-                rate_in_seconds=kwargs.get(ATTR_TRANSITION, 1),
-            )
+        await self._shade.set_light(
+            brightness=brightness,
+            temperature=temperature,
+            rate_in_seconds=kwargs.get(ATTR_TRANSITION, 1),
+        )

@@ -43,6 +43,9 @@ class PowerviewShadeUpdateCoordinator(DataUpdateCoordinator[PowerviewShadeData])
         # but it seems to handle all other requests that do not use RF without issue
         # so we have a lock to prevent multiple radio operations at the same time
         self.radio_operation_lock = asyncio.Lock()
+        if self.is_push:
+            shades.request.enable_position_batching(self.radio_operation_lock)
+            config_entry.async_on_unload(shades.request.disable_position_batching)
         super().__init__(
             hass,
             _LOGGER,
