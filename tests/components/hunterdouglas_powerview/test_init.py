@@ -47,13 +47,10 @@ async def test_register_integration_on_setup(
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
     assert mock_config_entry.state is ConfigEntryState.LOADED
-    assert (
-        mock_register_integration.await_args_list
-        == [call("HomeAssistant")] * registrations
-    )
+    assert mock_register_integration.await_args_list == [call("HA")] * registrations
     assert await hass.config_entries.async_reload(mock_config_entry.entry_id)
     await hass.async_block_till_done()
-    assert mock_register_integration.await_args_list == [call("HomeAssistant")] * (
+    assert mock_register_integration.await_args_list == [call("HA")] * (
         2 * registrations
     )
 
@@ -71,4 +68,4 @@ async def test_registration_failure_retries_setup(
     assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
     assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
-    mock_register_integration.assert_awaited_once_with("HomeAssistant")
+    mock_register_integration.assert_awaited_once_with("HA")
