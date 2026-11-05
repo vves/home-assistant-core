@@ -217,3 +217,12 @@ def shades_json(api_version: int, request: pytest.FixtureRequest) -> str:
         return "gen3/home/shades.json"
     # Add more conditions for different api_versions if needed
     raise ValueError(f"Unsupported api_version: {api_version}")
+
+
+@pytest.fixture(autouse=True)
+def mock_register_integration() -> Generator[AsyncMock]:
+    """Prevent setup from registering against a real gateway."""
+    with patch(
+        "homeassistant.components.hunterdouglas_powerview.util.Hub.register_integration"
+    ) as register:
+        yield register

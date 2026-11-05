@@ -80,6 +80,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: PowerviewConfigEntry) ->
     )
 
     try:
+        if hub.api_version >= 3:
+            await hub.register_integration("HomeAssistant")
+
         rooms = Rooms(pv_request)
         room_data: PowerviewData = await rooms.get_rooms()
 
